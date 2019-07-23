@@ -99,7 +99,7 @@ function SWEP:PrimaryAttack()
 			effectdata:SetScale(1)
 			
 			if CurHealth-blowtorch_normal_damage>0 then
-				Entity:EmitSound(Sound("Metal.SawbladeStick"))
+				Entity:EmitSound("Metal.SawbladeStick")
 				util.Effect("MetalSpark",effectdata,true,true)
 				Entity:SetNWInt("b_prop_health",CurHealth-blowtorch_normal_damage)
 			else
@@ -133,20 +133,15 @@ function SWEP:SecondaryAttack()
 			local MaxHealth=blowtorchables[Entity:GetClass()]
 			local CurHealth=Entity:GetNWInt("b_prop_health",MaxHealth)
 
-			if CurHealth!=MaxHealth and DarkRP and blowtorch_repair_cost>0 and ply:canAfford(blowtorch_repair_cost) then
-				ply:addMoney(blowtorch_repair_cost)
-			elseif CurHealth!=MaxHealth and DarkRP and blowtorch_repair_cost>0 then
-				ply:PrintMessage(HUD_PRINTTALK,"you cannot afford this repair")
-				return
-			end
-
 			if CurHealth==MaxHealth then
 				ply:PrintMessage(HUD_PRINTTALK,"this prop is at full health")
-			elseif CurHealth+blowtorch_repair_health>=MaxHealth then
-				Entity:SetNWInt("b_prop_health",MaxHealth)
-				Entity:EmitSound("ambient/energy/spark"..math.random(1,6)..".wav")
+			elseif ply.canAfford and blowtorch_repair_cost>0 and !ply:canAfford(blowtorch_repair_cost) then
+				ply:PrintMessage(HUD_PRINTTALK,"you cannot afford this repair")
 			else
-				Entity:SetNWInt("b_prop_health",CurHealth+blowtorch_repair_health)
+				if ply.addMoney then
+					ply:addMoney(blowtorch_repair_cost)
+				end
+				Entity:SetNWInt("b_prop_health",math.min(CurHealth+blowtorch_repair_health,MaxHealth))
 				Entity:EmitSound("ambient/energy/spark"..math.random(1,6)..".wav")
 			end
 		end
@@ -173,7 +168,7 @@ function SWEP:Reload()
 			effectdata:SetScale(1)
 
 			if CurHealth-blowtorch_blast_damage>0 then
-				Entity:EmitSound(Sound("Metal.SawbladeStick"))
+				Entity:EmitSound("Metal.SawbladeStick")
 				util.Effect("MetalSpark",effectdata,true,true)
 				Entity:SetNWInt("b_prop_health",CurHealth-blowtorch_blast_damage)
 			else
@@ -194,39 +189,23 @@ function SWEP:Reload()
 		end
 	end
 end
-function SWEP:DrawHUD()
+hook.Add("PreDrawHalos",SWEP.ClassName,function()
 	local ply=LocalPlayer()
-	local trace=ply:GetEyeTrace()
-	local Entity=trace.Entity
-	if Entity and Entity:IsValid() and blowtorchables[Entity:GetClass()] and Entity:CPPIGetOwner() and ply:GetShootPos():DistToSqr(trace.HitPos)<=blowtorch_max_distance then
-		local MaxHealth=blowtorchables[Entity:GetClass()]
-		local CurHealth=Entity:GetNWInt("b_prop_health",MaxHealth)
-		local pos=Entity:GetPos():ToScreen()
-		draw.DrawText("Health: "..CurHealth.."/"..MaxHealth,"Trebuchet24",pos.x,pos.y,Color(255-(CurHealth*2.5),CurHealth*2.5,0,255 ),TEXT_ALIGN_CENTER)
+	local self=ply:GetActiveWeapon()
+	if self.ClassName==SWEP.ClassName then
+		local trace=ply:GetEyeTrace()
+		local Entity=trace.Entity
+		if Entity and Entity:IsValid() and blowtorchables[Entity:GetClass()] and Entity:CPPIGetOwner() and ply:GetShootPos():DistToSqr(trace.HitPos)<=blowtorch_max_distance then
+			local MaxHealth=blowtorchables[Entity:GetClass()]
+			local CurHealth=Entity:GetNWInt("b_prop_health",MaxHealth)
+			local pos=Entity:GetPos():ToScreen()
+			local fraction=CurHealth/MaxHealth
+			local color=Color(255-fraction*255,fraction*255,0)
+			halo.Add({Entity},color,8,8,1,true,true)
+			cam.Start2D()
+			draw.DrawText("Health: "..CurHealth.."/"..MaxHealth,"Trebuchet24",pos.x,pos.y,color,TEXT_ALIGN_CENTER)
+			cam.End2D()
+		end
 	end
-end
+end)
 weapons.Register(SWEP,SWEP.ClassName)
-	--[[
-if CLIENT then
---	BobScale=1--(Clientside) The scale of the viewmodel bob (viewmodel movement from left to right when walking around) Default: 1
---	SwayScale=1--(Clientside) The scale of the viewmodel sway (viewmodel position lerp when looking around). Default: 1
---	BounceWeaponIcon=true--(Clientside) Should the weapon icon bounce in weapon selection? Default: true
---	DrawWeaponInfoBox=true--(Clientside) Should draw the weapon selection info box, containing Instructions, etc. Default: true
---	DrawCrosshair=true--(Clientside) Should we draw the default crosshair? Default: true
---	RenderGroup=RENDERGROUP_OPAQUE--(Clientside) The SWEP render group, see RENDERGROUP_ Enums Default: RENDERGROUP_OPAQUE
---	SpeechBubbleLid=surface.GetTextureID( "gui/speech_lid" )--(Clientside) Internal variable for drawing the info box in weapon selection Default: surface.GetTextureID( "gui/speech_lid" )
---	WepSelectIcon--(Clientside) Path to an texture. Override this in your SWEP to set the icon in the weapon selection. This must be the texture ID, see surface.GetTextureID Default: surface.GetTextureID( "weapons/swep" )
---	CSMuzzleFlashes=false--(Clientside) Should we use Counter-Strike muzzle flashes upon firing? This is required for DoD:S or CS:S view models to fix their muzzle flashes. Default: false
---	CSMuzzleX=false--(Clientside) Use the X shape muzzle flash instead of the default Counter-Strike muzzle flash. Requires CSMuzzleFlashes to be set to true Default: false
---	AccurateCrosshair=false--(Clientside) Makes the default SWEP crosshair be positioned in 3D space where your aim actually is (like on Jeep), instead of simply sitting in the middle of the screen at all times Default: false
-else
---	AutoSwitchFrom=true--(Serverside) Whether this weapon can be autoswitched away from when the player runs out of ammo in this weapon or picks up another weapon or ammo Default: true
---	AutoSwitchTo=true--(Serverside) Whether this weapon can be autoswitched to when the player runs out of ammo in their current weapon or they pick this weapon up Default: true
---	Weight=5--(Serverside) Decides whether we should switch from/to this Default: 5
-end
---ClassName--Entity class name of the SWEP (file or folder name of your SWEP). This is set automatically
---Base="weapon_base"--The base weapon to derive from. This must be a Lua weapon Default: "weapon_base"
---m_WeaponDeploySpeed=1--Multiplier of deploy speed Default: 1
---Owner--The entity that owns/wields this SWEP, if any
---Folder--The folder from where the weapon was loaded. This should always be "weapons/weapon_myweapon", regardless whether your SWEP is stored as a file, or multiple files in a folder. It is set automatically on load
---]]
